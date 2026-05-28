@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#050505" />
+    <title>Galerie immersive premium</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app-shell" aria-label="Galerie photo immersive">
+      <section class="viewer" id="viewer" aria-live="polite">
+        <div
+          class="image-buffer image-buffer--front is-visible"
+          id="frontBuffer"
+        ></div>
+        <div class="image-buffer image-buffer--back" id="backBuffer"></div>
+
+        <div class="ambient-vignette" aria-hidden="true"></div>
+        <div class="filename-overlay" id="filenameOverlay" aria-live="off"></div>
+
+        <header class="top-bar">
+          <div class="brand-block">
+            <span class="eyebrow">Vision Board</span>
+            <h1>Galerie</h1>
+          </div>
+          <div class="status-pill" id="modeStatus" aria-live="polite">
+            Manuel
+          </div>
+        </header>
+
+        <button
+          class="nav-hit nav-hit--prev"
+          id="prevButton"
+          type="button"
+          aria-label="Photo précédente"
+        >
+          <span aria-hidden="true">‹</span>
+        </button>
+        <button
+          class="nav-hit nav-hit--next"
+          id="nextButton"
+          type="button"
+          aria-label="Photo suivante"
+        >
+          <span aria-hidden="true">›</span>
+        </button>
+
+        <div class="bottom-reveal" id="bottomReveal">
+          <div class="progress-rail" aria-hidden="true">
+            <span id="progressBar"></span>
+          </div>
+
+          <footer class="control-dock" aria-label="Contrôles de la galerie">
+            <button class="control-button" id="shuffleButton" type="button">
+              <span class="icon" aria-hidden="true">⇄</span>
+              <span>Shuffle</span>
+            </button>
+
+            <button class="control-button" id="mixButton" type="button">
+              <span class="icon" aria-hidden="true">✶</span>
+              <span>Mix</span>
+            </button>
+
+            <button class="control-button" id="filterButton" type="button">
+              <span class="icon" aria-hidden="true">◐</span>
+              <span>Random Filter</span>
+            </button>
+
+            <button
+              class="control-button control-button--primary"
+              id="slideshowButton"
+              type="button"
+              aria-pressed="false"
+            >
+              <span class="icon" aria-hidden="true">▶</span>
+              <span id="slideshowLabel">Start</span>
+            </button>
+
+            <label class="time-control" for="durationSelect">
+              <span class="icon" aria-hidden="true">◴</span>
+              <span>Interval</span>
+              <select
+                id="durationSelect"
+                aria-label="Temps d'affichage par image"
+              >
+                <option value="2">2 s</option>
+                <option value="3">3 s</option>
+                <option value="5" selected>5 s</option>
+                <option value="8">8 s</option>
+                <option value="10">10 s</option>
+                <option value="15">15 s</option>
+              </select>
+            </label>
+
+            <label class="time-control time-control--long" for="maxDurationSelect">
+              <span class="icon" aria-hidden="true">⌛</span>
+              <span>Max</span>
+              <select
+                id="maxDurationSelect"
+                aria-label="Durée maximale du slideshow"
+              >
+                <option value="1">1 min</option>
+                <option value="5">5 min</option>
+                <option value="15">15 min</option>
+                <option value="30">30 min</option>
+                <option value="60" selected>1 h</option>
+                <option value="120">2 h</option>
+                <option value="360">6 h</option>
+                <option value="720">12 h</option>
+                <option value="1440">24 h</option>
+              </select>
+            </label>
+
+            <div
+              class="time-control time-control--countdown"
+              id="countdownTimer"
+              role="status"
+              aria-live="polite"
+              aria-label="Temps restant avant l'arrêt automatique"
+            >
+              <span class="icon" aria-hidden="true">⏱</span>
+              <span>Restant</span>
+              <span class="countdown-value" id="countdownValue">60:00</span>
+            </div>
+          </footer>
+        </div>
+      </section>
+    </main>
+
+    <script src="images/manifest.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
