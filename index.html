@@ -54,6 +54,15 @@
             <span id="progressBar"></span>
           </div>
 
+          <div class="image-picker" id="imagePicker" aria-hidden="true">
+            <div
+              class="image-picker-list"
+              id="imagePickerList"
+              role="listbox"
+              aria-label="Liste des images disponibles"
+            ></div>
+          </div>
+
           <footer class="control-dock" aria-label="Contrôles de la galerie">
             <button class="control-button" id="shuffleButton" type="button">
               <span class="icon" aria-hidden="true">⇄</span>
@@ -63,6 +72,17 @@
             <button class="control-button" id="mixButton" type="button">
               <span class="icon" aria-hidden="true">✶</span>
               <span>Mix</span>
+            </button>
+
+            <button
+              class="control-button"
+              id="imagePickerToggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="imagePicker"
+            >
+              <span class="icon" aria-hidden="true">☰</span>
+              <span>Images</span>
             </button>
 
             <button class="control-button" id="filterButton" type="button">

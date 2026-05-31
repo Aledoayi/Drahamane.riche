@@ -314,15 +314,71 @@ h1 {
   pointer-events: auto;
 }
 
+.image-picker {
+  position: absolute;
+  left: 50%;
+  bottom: calc(max(18px, env(safe-area-inset-bottom)) + 88px);
+  z-index: 6;
+  width: min(92vw, 420px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  background: rgba(12, 12, 12, 0.74);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(-50%, 8px, 0);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.image-picker.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate3d(-50%, 0, 0);
+}
+
+.image-picker-list {
+  max-height: min(42svh, 340px);
+  overflow: auto;
+  padding: 8px;
+}
+
+.image-picker-option {
+  width: 100%;
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 10px;
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+  font-size: 0.84rem;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.image-picker-option:hover,
+.image-picker-option:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  outline: none;
+}
+
+.image-picker-option.is-active {
+  background: rgba(13, 132, 255, 0.26);
+  color: #fff;
+}
+
 .control-dock {
   position: absolute;
   left: 50%;
   bottom: max(18px, env(safe-area-inset-bottom));
   display: grid;
-  grid-template-columns: repeat(7, auto);
+  grid-template-columns: repeat(8, auto);
   align-items: center;
   gap: 8px;
-  max-width: min(97vw, 1120px);
+  max-width: min(98vw, 1240px);
   min-height: 60px;
   padding: 8px;
   border: 1px solid var(--line);
@@ -351,6 +407,37 @@ h1 {
   opacity: 1;
   pointer-events: auto;
   transform: translate3d(-50%, 0, 0) scale(1);
+}
+
+.viewer.manual-controls-hidden .top-bar {
+  opacity: 0;
+  transform: translate3d(0, -12px, 0);
+}
+
+.viewer.manual-controls-hidden .control-dock {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(-50%, 12px, 0) scale(0.98);
+}
+
+.viewer.manual-controls-hidden .progress-rail {
+  opacity: 0;
+}
+
+.viewer.manual-controls-hidden .image-picker {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(-50%, 8px, 0);
+}
+
+.viewer.manual-controls-hidden .nav-hit span {
+  opacity: 0;
+  transform: translate3d(0, -50%, 0) scale(0.92);
+}
+
+.viewer.manual-controls-hidden .filename-overlay {
+  opacity: 0;
+  transform: translate3d(0, -6px, 0);
 }
 
 .control-button,
@@ -500,6 +587,11 @@ h1 {
     top: calc(max(14px, env(safe-area-inset-top)) + 64px);
     left: max(14px, env(safe-area-inset-left));
     max-width: min(82vw, 360px);
+  }
+
+  .image-picker {
+    width: calc(100vw - 24px);
+    max-width: 430px;
   }
 
   .control-dock {

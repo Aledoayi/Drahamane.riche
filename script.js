@@ -63,9 +63,14 @@ const progressBar = document.querySelector("#progressBar");
 const prevButton = document.querySelector("#prevButton");
 const nextButton = document.querySelector("#nextButton");
 const bottomReveal = document.querySelector("#bottomReveal");
+const imagePickerToggle = document.querySelector("#imagePickerToggle");
+const imagePicker = document.querySelector("#imagePicker");
+const imagePickerList = document.querySelector("#imagePickerList");
 let controlsHideId = 0;
 let cursorHideId = 0;
 let filenameHideId = 0;
+let imagePickerHideId = 0;
+let manualControlsHideId = 0;
 const imageMeta = new Map();
 
 state.visibleBuffer = frontBuffer;
@@ -76,9 +81,12 @@ state.maxDurationMs = Number(maxDurationSelect.value || 60) * 60 * 1000;
 async function bootGallery() {
   state.images = await discoverImages();
   state.currentIndex = getRandomIndex(state.images.length);
+  renderImagePickerList();
   preloadImages(state.images);
   await paintInitialImage();
+  updateImagePickerSelection();
   updateStatus();
+  scheduleManualControlsHide(1000);
 }
 
 async function discoverImages() {
@@ -287,6 +295,7 @@ async function paintInitialImage() {
   state.visibleBuffer.classList.add("is-visible");
   state.hiddenBuffer.classList.remove("is-visible");
   updateFilenameOverlayText();
+  updateImagePickerSelection();
 }
 
 function setBufferImage(buffer, src) {
@@ -366,6 +375,7 @@ function showImage(nextIndex, direction = 1) {
         state.visibleBuffer = state.hiddenBuffer;
         state.hiddenBuffer = previous;
         updateFilenameOverlayText();
+        updateImagePickerSelection();
 
         requestAnimationFrame(() => {
           state.visibleBuffer.classList.remove("no-transition");
@@ -390,6 +400,100 @@ function wrapIndex(index) {
     return 0;
   }
   return (index + state.images.length) % state.images.length;
+}
+
+function isImagePickerOpen() {
+  return Boolean(imagePicker?.classList.contains("is-open"));
+}
+
+function openImagePicker() {
+  if (!imagePicker || !imagePickerToggle) {
+    return;
+  }
+  window.clearTimeout(imagePickerHideId);
+  imagePicker.classList.add("is-open");
+  imagePicker.setAttribute("aria-hidden", "false");
+  imagePickerToggle.setAttribute("aria-expanded", "true");
+  revealManualControls();
+}
+
+function closeImagePicker(immediate = true) {
+  if (!imagePicker || !imagePickerToggle) {
+    return;
+  }
+  if (!immediate) {
+    scheduleHideImagePicker();
+    return;
+  }
+  window.clearTimeout(imagePickerHideId);
+  imagePicker.classList.remove("is-open");
+  imagePicker.setAttribute("aria-hidden", "true");
+  imagePickerToggle.setAttribute("aria-expanded", "false");
+}
+
+function scheduleHideImagePicker(delay = 1000) {
+  if (!imagePicker) {
+    return;
+  }
+  window.clearTimeout(imagePickerHideId);
+  imagePickerHideId = window.setTimeout(() => {
+    closeImagePicker(true);
+  }, delay);
+}
+
+function cancelHideImagePicker() {
+  window.clearTimeout(imagePickerHideId);
+}
+
+function renderImagePickerList() {
+  if (!imagePickerList) {
+    return;
+  }
+  imagePickerList.textContent = "";
+  if (state.images.length === 0) {
+    const emptyItem = document.createElement("div");
+    emptyItem.className = "image-picker-option";
+    emptyItem.textContent = "Aucune image disponible";
+    emptyItem.setAttribute("aria-disabled", "true");
+    imagePickerList.append(emptyItem);
+    return;
+  }
+
+  state.images.forEach((src, index) => {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "image-picker-option";
+    option.textContent = getFilenameFromPath(src);
+    option.dataset.src = src;
+    option.setAttribute("role", "option");
+    option.setAttribute("aria-selected", "false");
+    option.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const selectedSrc = option.dataset.src || "";
+      const selectedIndex = state.images.indexOf(selectedSrc);
+      if (selectedIndex < 0) {
+        return;
+      }
+      const direction = selectedIndex >= state.currentIndex ? 1 : -1;
+      showImage(selectedIndex, direction);
+      scheduleHideImagePicker();
+    });
+    imagePickerList.append(option);
+  });
+}
+
+function updateImagePickerSelection() {
+  if (!imagePickerList) {
+    return;
+  }
+  const currentSrc = state.images[state.currentIndex] || "";
+  const options = imagePickerList.querySelectorAll(".image-picker-option[data-src]");
+  options.forEach((option) => {
+    const isActive = option.dataset.src === currentSrc;
+    option.classList.toggle("is-active", isActive);
+    option.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
 }
 
 function shuffleImages() {
@@ -441,10 +545,12 @@ function applyRandomFilter() {
 }
 
 function toggleSlideshow() {
-  state.isPlaying ? stopSlideshow() : startSlideshow();
+  state.isPlaying ? stopSlideshow({ hideUiAfterStop: true }) : startSlideshow();
 }
 
 async function startSlideshow() {
+  revealManualControls();
+  closeImagePicker(true);
   state.isPlaying = true;
   state.slideshowStartedAt = performance.now();
   viewer.classList.add("is-playing");
@@ -461,7 +567,7 @@ async function startSlideshow() {
   scheduleNextSlide();
 }
 
-function stopSlideshow() {
+function stopSlideshow(options = {}) {
   state.isPlaying = false;
   state.slideshowStartedAt = 0;
   viewer.classList.remove(
@@ -480,6 +586,11 @@ function stopSlideshow() {
   void releaseWakeLock();
   updateStatus();
   updateCountdownDisplay();
+  if (options.hideUiAfterStop) {
+    scheduleManualControlsHide();
+  } else {
+    revealManualControls();
+  }
 }
 
 async function acquireWakeLock() {
@@ -621,6 +732,63 @@ function updateStatus() {
     : "Manuel";
 }
 
+function revealManualControls() {
+  window.clearTimeout(manualControlsHideId);
+  viewer.classList.remove("manual-controls-hidden");
+}
+
+function shouldKeepManualControlsVisible() {
+  if (state.isPlaying) {
+    return true;
+  }
+  return Boolean(
+    isImagePickerOpen() ||
+      (bottomReveal &&
+        (bottomReveal.matches(":hover") || bottomReveal.matches(":focus-within"))),
+  );
+}
+
+function isPointerNearBottomControls(event) {
+  if (!bottomReveal) {
+    return false;
+  }
+  const rect = bottomReveal.getBoundingClientRect();
+  return event.clientY >= rect.top - 12;
+}
+
+function scheduleManualControlsHide(delay = 1000) {
+  window.clearTimeout(manualControlsHideId);
+  manualControlsHideId = window.setTimeout(() => {
+    if (shouldKeepManualControlsVisible()) {
+      scheduleManualControlsHide(delay);
+      return;
+    }
+    viewer.classList.add("manual-controls-hidden");
+    closeImagePicker(true);
+    hideFilenameOverlay();
+  }, delay);
+}
+
+function handleManualControlsActivity(event) {
+  if (state.isPlaying) {
+    return;
+  }
+
+  const pointerType = event.pointerType || "";
+  const isTouchPointer =
+    pointerType && pointerType !== "mouse" && pointerType !== "pen";
+  if (isTouchPointer) {
+    revealManualControls();
+    scheduleManualControlsHide(1000);
+    return;
+  }
+
+  if (isPointerNearBottomControls(event)) {
+    revealManualControls();
+    scheduleManualControlsHide(1000);
+  }
+}
+
 function getFilenameFromPath(src) {
   if (!src || typeof src !== "string") {
     return "";
@@ -671,7 +839,15 @@ function pulseStatus(text) {
 }
 
 function onPointerDown(event) {
-  if (event.target.closest(".control-dock")) {
+  handleManualControlsActivity(event);
+  if (
+    isImagePickerOpen() &&
+    !event.target.closest("#imagePicker") &&
+    !event.target.closest("#imagePickerToggle")
+  ) {
+    scheduleHideImagePicker();
+  }
+  if (event.target.closest(".control-dock") || event.target.closest("#imagePicker")) {
     return;
   }
   showFilenameOverlayBriefly();
@@ -688,6 +864,7 @@ function onPointerDown(event) {
 
 function onPointerMove(event) {
   updateNavigationHover(event);
+  handleManualControlsActivity(event);
   revealControlsNearBottom(event);
   if (!state.drag.active || event.pointerId !== state.drag.pointerId) {
     return;
@@ -762,8 +939,17 @@ function revealControlsNearBottom(event) {
   }, 1800);
 }
 
+bottomReveal.addEventListener("pointerenter", () => {
+  revealManualControls();
+  window.clearTimeout(manualControlsHideId);
+});
+bottomReveal.addEventListener("pointermove", () => {
+  revealManualControls();
+  window.clearTimeout(manualControlsHideId);
+});
 bottomReveal.addEventListener("pointerleave", () => {
   viewer.classList.remove("controls-visible");
+  scheduleManualControlsHide(1000);
 });
 
 function onPointerUp(event) {
@@ -813,10 +999,27 @@ function navigateManually(offset, direction, button, event) {
   showImage(state.currentIndex + offset, direction);
 }
 
+function toggleImagePicker(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  if (isImagePickerOpen()) {
+    closeImagePicker(true);
+  } else {
+    openImagePicker();
+  }
+}
+
 shuffleButton.addEventListener("click", shuffleImages);
 mixButton.addEventListener("click", randomMixImages);
 filterButton.addEventListener("click", applyRandomFilter);
 slideshowButton.addEventListener("click", toggleSlideshow);
+if (imagePickerToggle) {
+  imagePickerToggle.addEventListener("click", toggleImagePicker);
+}
+if (imagePicker) {
+  imagePicker.addEventListener("pointerenter", cancelHideImagePicker);
+  imagePicker.addEventListener("pointerleave", () => scheduleHideImagePicker());
+}
 prevButton.addEventListener("click", (event) => {
   navigateManually(-1, -1, prevButton, event);
 });
@@ -856,6 +1059,7 @@ viewer.addEventListener("pointerenter", (event) => {
 });
 viewer.addEventListener("pointerleave", (event) => {
   clearNavigationHover();
+  scheduleHideImagePicker();
   if (!event.pointerType || event.pointerType === "mouse" || event.pointerType === "pen") {
     hideFilenameOverlay();
   }
@@ -868,15 +1072,23 @@ document.addEventListener("visibilitychange", () => {
     stopCountdownTimer();
     void releaseWakeLock();
     hideFilenameOverlay();
+    closeImagePicker(true);
   } else if (state.isPlaying) {
     void acquireWakeLock();
     scheduleAutoStop();
     scheduleNextSlide();
     startCountdownTimer();
+  } else if (!document.hidden) {
+    revealManualControls();
+    scheduleManualControlsHide(1000);
   }
 });
 
 window.addEventListener("keydown", (event) => {
+  if (!state.isPlaying) {
+    revealManualControls();
+    scheduleManualControlsHide(1000);
+  }
   if (event.key === "ArrowRight") showImage(state.currentIndex + 1, 1);
   if (event.key === "ArrowLeft") showImage(state.currentIndex - 1, -1);
   if (event.key === " ") {
