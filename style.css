@@ -375,10 +375,10 @@ h1 {
   left: 50%;
   bottom: max(18px, env(safe-area-inset-bottom));
   display: grid;
-  grid-template-columns: repeat(8, auto);
+  grid-template-columns: repeat(9, auto);
   align-items: center;
   gap: 8px;
-  max-width: min(98vw, 1240px);
+  max-width: min(98vw, 1380px);
   min-height: 60px;
   padding: 8px;
   border: 1px solid var(--line);
@@ -485,6 +485,17 @@ h1 {
   color: #fff;
 }
 
+.control-button--toggle.is-active {
+  border-color: rgba(94, 179, 255, 0.58);
+  color: #fff;
+  background: rgba(13, 132, 255, 0.34);
+}
+
+.time-control select:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
 .icon {
   display: grid;
   place-items: center;
@@ -574,7 +585,7 @@ h1 {
 
 @media (max-width: 720px) {
   :root {
-    --dock-height: 246px;
+    --dock-height: 290px;
   }
 
   .top-bar {

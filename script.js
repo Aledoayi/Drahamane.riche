@@ -27,7 +27,9 @@ const state = {
   visibleBuffer: null,
   hiddenBuffer: null,
   isPlaying: false,
+  isPlayOnce: false,
   durationMs: 5000,
+  configuredMaxDurationMs: 60 * 60 * 1000,
   maxDurationMs: 60 * 60 * 1000,
   timerId: 0,
   autoStopTimerId: 0,
@@ -54,6 +56,7 @@ const mixButton = document.querySelector("#mixButton");
 const filterButton = document.querySelector("#filterButton");
 const slideshowButton = document.querySelector("#slideshowButton");
 const slideshowLabel = document.querySelector("#slideshowLabel");
+const playOnceButton = document.querySelector("#playOnceButton");
 const durationSelect = document.querySelector("#durationSelect");
 const maxDurationSelect = document.querySelector("#maxDurationSelect");
 const countdownValue = document.querySelector("#countdownValue");
@@ -76,7 +79,9 @@ const imageMeta = new Map();
 state.visibleBuffer = frontBuffer;
 state.hiddenBuffer = backBuffer;
 state.durationMs = Number(durationSelect.value || 5) * 1000;
-state.maxDurationMs = Number(maxDurationSelect.value || 60) * 60 * 1000;
+state.configuredMaxDurationMs =
+  Number(maxDurationSelect.value || 60) * 60 * 1000;
+state.maxDurationMs = state.configuredMaxDurationMs;
 
 async function bootGallery() {
   state.images = await discoverImages();
@@ -391,6 +396,9 @@ function showImage(nextIndex, direction = 1) {
   });
 
   if (state.isPlaying) {
+    if (state.isPlayOnce) {
+      restartPlayOnceTiming();
+    }
     scheduleNextSlide();
   }
 }
@@ -548,9 +556,57 @@ function toggleSlideshow() {
   state.isPlaying ? stopSlideshow({ hideUiAfterStop: true }) : startSlideshow();
 }
 
+function getPlayOnceImageCount(fromCurrentImage = state.isPlaying) {
+  if (state.images.length === 0) {
+    return 0;
+  }
+  return fromCurrentImage
+    ? Math.max(state.images.length - state.currentIndex, 1)
+    : state.images.length;
+}
+
+function getPlayOnceDurationMs(fromCurrentImage = state.isPlaying) {
+  return getPlayOnceImageCount(fromCurrentImage) * state.durationMs;
+}
+
+function restartPlayOnceTiming() {
+  if (!state.isPlaying || !state.isPlayOnce) {
+    return;
+  }
+  state.maxDurationMs = getPlayOnceDurationMs(true);
+  state.slideshowStartedAt = performance.now();
+  scheduleAutoStop();
+  startCountdownTimer();
+}
+
+function togglePlayOnce() {
+  state.isPlayOnce = !state.isPlayOnce;
+  playOnceButton.classList.toggle("is-active", state.isPlayOnce);
+  playOnceButton.setAttribute("aria-pressed", String(state.isPlayOnce));
+  maxDurationSelect.disabled = state.isPlayOnce;
+
+  if (state.isPlayOnce) {
+    state.maxDurationMs = getPlayOnceDurationMs(state.isPlaying);
+  } else {
+    state.maxDurationMs = state.configuredMaxDurationMs;
+  }
+
+  if (state.isPlaying) {
+    state.slideshowStartedAt = performance.now();
+    scheduleAutoStop();
+    startCountdownTimer();
+    scheduleNextSlide();
+  } else {
+    updateCountdownDisplay();
+  }
+}
+
 async function startSlideshow() {
   revealManualControls();
   closeImagePicker(true);
+  state.maxDurationMs = state.isPlayOnce
+    ? getPlayOnceDurationMs(true)
+    : state.configuredMaxDurationMs;
   state.isPlaying = true;
   state.slideshowStartedAt = performance.now();
   viewer.classList.add("is-playing");
@@ -570,6 +626,9 @@ async function startSlideshow() {
 function stopSlideshow(options = {}) {
   state.isPlaying = false;
   state.slideshowStartedAt = 0;
+  state.maxDurationMs = state.isPlayOnce
+    ? getPlayOnceDurationMs(false)
+    : state.configuredMaxDurationMs;
   viewer.classList.remove(
     "is-playing",
     "controls-visible",
@@ -641,12 +700,12 @@ function scheduleAutoStop() {
 
   const remaining = getRemainingSlideshowDurationMs();
   if (remaining <= 0) {
-    stopSlideshow();
+    stopSlideshow({ hideUiAfterStop: state.isPlayOnce });
     return;
   }
 
   state.autoStopTimerId = window.setTimeout(() => {
-    stopSlideshow();
+    stopSlideshow({ hideUiAfterStop: state.isPlayOnce });
   }, remaining);
 }
 
@@ -701,7 +760,7 @@ function startCountdownTimer() {
       countdownValue.textContent = formatCountdown(remaining);
     }
     if (remaining <= 0) {
-      stopSlideshow();
+      stopSlideshow({ hideUiAfterStop: state.isPlayOnce });
     }
   }, 250);
 }
@@ -712,6 +771,10 @@ function scheduleNextSlide() {
   state.progressStartedAt = performance.now();
   animateProgress();
   state.timerId = window.setTimeout(() => {
+    if (state.isPlayOnce && state.currentIndex >= state.images.length - 1) {
+      stopSlideshow({ hideUiAfterStop: true });
+      return;
+    }
     showImage(state.currentIndex + 1, 1);
   }, state.durationMs);
 }
@@ -1013,6 +1076,7 @@ shuffleButton.addEventListener("click", shuffleImages);
 mixButton.addEventListener("click", randomMixImages);
 filterButton.addEventListener("click", applyRandomFilter);
 slideshowButton.addEventListener("click", toggleSlideshow);
+playOnceButton.addEventListener("click", togglePlayOnce);
 if (imagePickerToggle) {
   imagePickerToggle.addEventListener("click", toggleImagePicker);
 }
@@ -1032,13 +1096,27 @@ bindNavigationHover(nextButton);
 durationSelect.addEventListener("change", (event) => {
   state.durationMs = Number(event.target.value) * 1000;
   updateStatus();
+  if (state.isPlayOnce) {
+    state.maxDurationMs = getPlayOnceDurationMs(state.isPlaying);
+    if (state.isPlaying) {
+      state.slideshowStartedAt = performance.now();
+      scheduleAutoStop();
+      startCountdownTimer();
+    } else {
+      updateCountdownDisplay();
+    }
+  }
   if (state.isPlaying) {
     scheduleNextSlide();
   }
 });
 
 maxDurationSelect.addEventListener("change", (event) => {
-  state.maxDurationMs = Number(event.target.value) * 60 * 1000;
+  state.configuredMaxDurationMs = Number(event.target.value) * 60 * 1000;
+  if (state.isPlayOnce) {
+    return;
+  }
+  state.maxDurationMs = state.configuredMaxDurationMs;
   if (state.isPlaying) {
     scheduleAutoStop();
     startCountdownTimer();
