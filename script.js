@@ -28,6 +28,7 @@ const state = {
   hiddenBuffer: null,
   isPlaying: false,
   isPlayOnce: false,
+  playOnceRemainingImages: 0,
   durationMs: 5000,
   configuredMaxDurationMs: 60 * 60 * 1000,
   maxDurationMs: 60 * 60 * 1000,
@@ -396,9 +397,6 @@ function showImage(nextIndex, direction = 1) {
   });
 
   if (state.isPlaying) {
-    if (state.isPlayOnce) {
-      restartPlayOnceTiming();
-    }
     scheduleNextSlide();
   }
 }
@@ -556,27 +554,8 @@ function toggleSlideshow() {
   state.isPlaying ? stopSlideshow({ hideUiAfterStop: true }) : startSlideshow();
 }
 
-function getPlayOnceImageCount(fromCurrentImage = state.isPlaying) {
-  if (state.images.length === 0) {
-    return 0;
-  }
-  return fromCurrentImage
-    ? Math.max(state.images.length - state.currentIndex, 1)
-    : state.images.length;
-}
-
-function getPlayOnceDurationMs(fromCurrentImage = state.isPlaying) {
-  return getPlayOnceImageCount(fromCurrentImage) * state.durationMs;
-}
-
-function restartPlayOnceTiming() {
-  if (!state.isPlaying || !state.isPlayOnce) {
-    return;
-  }
-  state.maxDurationMs = getPlayOnceDurationMs(true);
-  state.slideshowStartedAt = performance.now();
-  scheduleAutoStop();
-  startCountdownTimer();
+function getPlayOnceDurationMs(imageCount = state.images.length) {
+  return imageCount * state.durationMs;
 }
 
 function togglePlayOnce() {
@@ -586,8 +565,10 @@ function togglePlayOnce() {
   maxDurationSelect.disabled = state.isPlayOnce;
 
   if (state.isPlayOnce) {
-    state.maxDurationMs = getPlayOnceDurationMs(state.isPlaying);
+    state.playOnceRemainingImages = state.images.length;
+    state.maxDurationMs = getPlayOnceDurationMs();
   } else {
+    state.playOnceRemainingImages = 0;
     state.maxDurationMs = state.configuredMaxDurationMs;
   }
 
@@ -604,8 +585,9 @@ function togglePlayOnce() {
 async function startSlideshow() {
   revealManualControls();
   closeImagePicker(true);
+  state.playOnceRemainingImages = state.isPlayOnce ? state.images.length : 0;
   state.maxDurationMs = state.isPlayOnce
-    ? getPlayOnceDurationMs(true)
+    ? getPlayOnceDurationMs()
     : state.configuredMaxDurationMs;
   state.isPlaying = true;
   state.slideshowStartedAt = performance.now();
@@ -626,8 +608,9 @@ async function startSlideshow() {
 function stopSlideshow(options = {}) {
   state.isPlaying = false;
   state.slideshowStartedAt = 0;
+  state.playOnceRemainingImages = 0;
   state.maxDurationMs = state.isPlayOnce
-    ? getPlayOnceDurationMs(false)
+    ? getPlayOnceDurationMs()
     : state.configuredMaxDurationMs;
   viewer.classList.remove(
     "is-playing",
@@ -771,9 +754,12 @@ function scheduleNextSlide() {
   state.progressStartedAt = performance.now();
   animateProgress();
   state.timerId = window.setTimeout(() => {
-    if (state.isPlayOnce && state.currentIndex >= state.images.length - 1) {
-      stopSlideshow({ hideUiAfterStop: true });
-      return;
+    if (state.isPlayOnce) {
+      state.playOnceRemainingImages -= 1;
+      if (state.playOnceRemainingImages <= 0) {
+        stopSlideshow({ hideUiAfterStop: true });
+        return;
+      }
     }
     showImage(state.currentIndex + 1, 1);
   }, state.durationMs);
@@ -1097,7 +1083,10 @@ durationSelect.addEventListener("change", (event) => {
   state.durationMs = Number(event.target.value) * 1000;
   updateStatus();
   if (state.isPlayOnce) {
-    state.maxDurationMs = getPlayOnceDurationMs(state.isPlaying);
+    const imageCount = state.isPlaying
+      ? Math.max(state.playOnceRemainingImages, 1)
+      : state.images.length;
+    state.maxDurationMs = getPlayOnceDurationMs(imageCount);
     if (state.isPlaying) {
       state.slideshowStartedAt = performance.now();
       scheduleAutoStop();
